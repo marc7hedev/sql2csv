@@ -10,52 +10,44 @@ const processSQLFile = (filePath) => {
         sqlData = fs.readFileSync(filePath, "utf16le"); // Intenta con UTF-16LE
         console.log(`Archivo leído con UTF-16LE: ${filePath}`);
     } catch (err) {
-        console.error(
-            `Error al leer el archivo con UTF-16LE: ${filePath}`,
-            err
-        );
         try {
             sqlData = fs.readFileSync(filePath, "utf-8"); // Intenta con UTF-8
             console.log(`Archivo leído con UTF-8: ${filePath}`);
         } catch (err) {
-            console.error(
-                `Error al leer el archivo con UTF-8: ${filePath}`,
-                err
-            );
+            console.error(`Error al leer el archivo ${filePath}:`, err);
             return null;
         }
     }
 
-    // Expresión regular para extraer las filas INSERT INTO
-    const insertRegex = /INSERT INTO\s+[\w.]+\s+VALUES\s+\((.*?)\);/gi;
-
-    let match;
-    const rows = [];
-    let headers = [];
-
-    // Opcional: Extraer nombres de columnas desde CREATE TABLE
-    const createTableRegex = /CREATE TABLE\s+[\w.]+\s*\((.*?)\)/i;
+    // Expresión regular para extraer el CREATE TABLE y los encabezados de columnas
+    const createTableRegex = /CREATE TABLE\s+[\w.]+\s*\((.*?)\)/is;
     const createMatch = createTableRegex.exec(sqlData);
+
+    let headers = [];
     if (createMatch) {
         headers = createMatch[1].split(",").map((col) =>
             col
                 .trim()
                 .split(" ")[0]
                 .replace(/[`"\[\]]/g, "")
-        ); // Limpiar posibles comillas o brackets
+        ); // Extraer nombres de columnas
         console.log(`Encabezados extraídos: ${headers.join(", ")}`);
     } else {
         console.warn(
             `No se encontraron encabezados en el archivo: ${filePath}`
         );
-        // Si no se encuentran encabezados, puedes definirlos manualmente o saltar
-        // headers = ['CONTRACT', 'ADDRESS', 'ADDRESS_TYPE', 'CITY', 'REGION', 'POSTAL_CODE', 'COUNTRY'];
+        return null;
     }
+
+    // Expresión regular para extraer las filas INSERT INTO
+    const insertRegex = /INSERT INTO\s+\w+\s+VALUES\s+\((.*?)\);/gi;
+    let match;
+    const rows = [];
 
     // Extraer todas las filas INSERT INTO
     while ((match = insertRegex.exec(sqlData)) !== null) {
         const valuesString = match[1];
-        // Manejar posibles comas dentro de los valores usando una expresión regular más robusta
+        // Manejar posibles comas dentro de los valores
         const values = [];
         let current = "";
         let insideString = false;
@@ -74,7 +66,6 @@ const processSQLFile = (filePath) => {
                 current += char;
             }
         }
-        // Añadir el último valor
         if (current.length > 0) {
             values.push(
                 current.trim().replace(/^'|'$/g, "").replace(/\\'/g, "'")
@@ -87,7 +78,6 @@ const processSQLFile = (filePath) => {
     console.log(
         `Total de filas extraídas en ${path.basename(filePath)}: ${rows.length}`
     );
-
     if (rows.length === 0) {
         console.warn(
             `No se encontraron filas INSERT INTO en el archivo: ${filePath}`
@@ -130,13 +120,10 @@ fs.readdir(sqlFolderPath, (err, files) => {
             const data = processSQLFile(filePath);
 
             if (data) {
-                // Generar el nombre de archivo CSV manteniendo el nombre del archivo SQL
                 const outputFilePath = path.join(
                     csvOutputFolderPath,
                     path.basename(file, ".sql") + ".csv"
                 );
-
-                // Convertir a CSV
                 convertToCSV(data, outputFilePath);
             } else {
                 console.warn(`No se generó CSV para el archivo: ${file}`);
