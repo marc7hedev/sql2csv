@@ -8,5 +8,10 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": ""
+  "description": "",
+  "dependencies": {
+    "fast-csv": "^5.0.1",
+    "fs": "^0.0.1-security",
+    "path": "^0.12.7"
+  }
 }
